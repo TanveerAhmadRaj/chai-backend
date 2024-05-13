@@ -5,6 +5,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import { json } from "express";
+import mongoose from "mongoose";
 const generateAccessAndRefreshToken = async (userId) => {
     try {
         const user = await User.findById(userId);
@@ -358,6 +359,61 @@ const getUserChannelProfile = asyncHandler (async (req, res)=>{
   } catch (error) {
     
   }
+});
+const getWatchHistory = asyncHandler (async (req, res)=> {
+    const user = User.aggregate([
+      {
+        $match: {
+          _id:  mongoose.Types.ObjectId(req.user._id)
+        }
+      },
+      {
+          $lookup: {
+            from: "videos",
+            localField: "watchHistory",
+            foreignField: "_id",
+            as:  "watchHistory",
+            pipeline: [
+              {
+                $lookup: {
+                  from: "users",
+                  localField: "owner",
+                  foreignField: "_id",
+                  as: "owner",
+                  pipeline: [
+                    {
+                      $project: {
+                        fullname: 1,
+                        username: 1,
+                        avatar
+
+                      }
+                    },
+                    {
+                      $addFields: {
+                        owner: {
+                          $first: "$owner"
+                        }
+                      }
+                    }
+                  ]
+                }
+
+              }
+            ]
+          }
+      }
+    ]);
+    if (!user) {
+      throw new ApiError (404, "Watch history does not exist");
+    } 
+    return res
+    .status(200)
+    .json(new ApiResponse (
+      200, 
+      user[0].watchHistory,
+      "Watch history is fetched successfully"
+    ));
 })
 export { 
   registerUser, 
@@ -368,5 +424,6 @@ export {
   updateAccountDetails,
   updateAvatar,
   updateCoverImage,
-  getUserChannelProfile
+  getUserChannelProfile,
+  getWatchHistory
 };
